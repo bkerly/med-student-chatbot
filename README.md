@@ -1,97 +1,169 @@
-#Simulated Standardized Patient (SP) Chatbot
-##Overview
-This application is a Simulated Standardized Patient (SP) tool designed for medical education. It utilizes a local Large Language Model (LLM) to roleplay various patient personas, allowing medical students and professionals to practice history-taking, motivational interviewing, and clinical reasoning in a risk-free environment.
+# Simulated Standardized Patient (SP) Chatbot
 
-The application allows educators to define custom clinical scenarios and patient characteristics using external Excel files, ensuring easy modification and distribution of curriculum content.
+A medical education tool that uses local LLMs to simulate patient encounters for training healthcare professionals.
 
-##Prerequisites
-Before installing the application, ensure the following software is installed on the host machine:
+## 🚀 Quick Start
 
-Python 3.8 or higher: Required to run the application logic.
+### Prerequisites
 
-Ollama: The local LLM backend.
+1. **Python 3.8+** - [Download Python](https://www.python.org/downloads/)
 
-Download and install Ollama from the official website.
+2. **Ollama** - Install the local LLM server:
+   - Download from [ollama.ai](https://ollama.ai)
+   - Install and start the service:
+     ```bash
+     ollama serve
+     ```
+   - Pull the Mistral model:
+     ```bash
+     ollama pull mistral
+     ```
 
-Ensure the service is running (ollama serve).
+### Installation
 
-Pull the desired model (default is mistral) by running: ollama pull mistral.
+1. **Run the setup script:**
+   ```bash
+   python3 setup.py
+   ```
+   
+   This will:
+   - Create a Python virtual environment
+   - Install all dependencies
+   - Generate a sample scenario file
+   - Create launch scripts
 
-##Installation and Setup
-A dedicated setup script is provided to automate the creation of the virtual environment and installation of dependencies.
+2. **Start the application:**
+   - **macOS/Linux:** `./run.sh`
+   - **Windows:** Double-click `run.bat`
 
-Open your terminal or command prompt.
+3. **Open your browser** to `http://localhost:8501`
 
-Navigate to the project directory.
+## 📖 How to Use
 
-Run the setup script:
+1. **Upload a scenario file** - Use the sidebar to upload `scenarios.xlsx` or your own file
+2. **Select a patient** - Choose from the dropdown menu
+3. **Review the rubric** - Check the assessment criteria in the sidebar
+4. **Start the conversation** - Type messages to practice your clinical skills
+5. **Download transcript** - Save the conversation for review or grading
 
-Bash
-python setup.py
-This script will:
+## 🎯 Features
 
-Create a local Python virtual environment (venv).
+- ✅ Multiple patient personas per scenario
+- ✅ Customizable via Excel files (no coding required)
+- ✅ Realistic patient responses using local LLMs
+- ✅ Session transcripts for review
+- ✅ Assessment rubrics for self-evaluation
+- ✅ Privacy-focused (runs entirely on your machine)
 
-Install required libraries (streamlit, pandas, openpyxl, requests).
+## 📊 Creating Custom Scenarios
 
-Generate the necessary execution scripts (run.bat for Windows or run.sh for macOS/Linux).
+Create an Excel file (`.xlsx`) with this structure:
 
-Generate a sample scenario file (scenarios.xlsx).
+### Sheet 1: "Scenario Info"
+| Scenario | Teaching points |
+|----------|----------------|
+| Scenario title | Assessment rubric or learning objectives |
 
-##Usage
-1. Starting the Application
-To launch the application, execute the start script generated during setup:
+### Sheet 2: "Patients"
+| Name | Characteristics |
+|------|----------------|
+| Patient name | Detailed persona, medical history, personality traits |
 
-Windows: Double-click run.bat or run it from the command prompt.
+**Example:**
 
-macOS / Linux: Run ./run.sh from the terminal.
+**Sheet 1:**
+| Scenario | Teaching points |
+|----------|----------------|
+| Smoking cessation counseling | Motivational interviewing; assess readiness to change; create action plan |
 
-The application will open automatically in your default web browser (typically at http://localhost:8501).
+**Sheet 2:**
+| Name | Characteristics |
+|------|----------------|
+| Mr. Smith | 66yo male, hesitant about quitting, early COPD, tried patches before |
+| Ms. Rodriguez | 45yo female, 1 PPD, pre-diabetic, defensive about smoking |
 
-##2. Loading Scenarios
-The application requires a scenario definition file to function. A sample file named scenarios.xlsx is included in the root directory.
+## ⚙️ Configuration
 
-To use your own scenarios, create an Excel file (.xlsx) with the following strict structure:
+Customize the chatbot using environment variables:
 
-Sheet 1 (Context)
+```bash
+# Change Ollama URL (default: http://localhost:11434)
+export OLLAMA_URL="http://your-server:11434"
 
-Sheet Name: (Arbitrary, usually "Scenario Info")
+# Use a different model (default: mistral)
+export OLLAMA_MODEL="llama2"
+```
 
-Column A Header: Scenario (The title of the clinical module)
+Available models (must be pulled first):
+- `mistral` - Fast, balanced performance (recommended)
+- `llama2` - Good alternative
+- `mixtral` - Larger, more capable (requires more RAM)
 
-Column B Header: Teaching points (Rubric or goals for the learner)
+To pull a model:
+```bash
+ollama pull mistral
+```
 
-Sheet 2 (Patient List)
+## 🔧 Troubleshooting
 
-Sheet Name: (Arbitrary, usually "Patients")
+### "Cannot connect to Ollama"
+- Make sure Ollama is running: `ollama serve`
+- Check if the service is accessible: `curl http://localhost:11434/api/tags`
+- Verify firewall settings aren't blocking port 11434
 
-Column A Header: Name (The patient's name, e.g., "Mr. Smith")
+### "Model not found"
+- Pull the model: `ollama pull mistral`
+- Check available models: `ollama list`
+- Update the MODEL variable if using a different model
 
-Column B Header: Characteristics (Detailed persona instructions, medical history, and personality traits)
+### "Excel file error"
+- Ensure your Excel file has exactly 2 sheets
+- Verify column names match exactly: "Scenario", "Teaching points", "Name", "Characteristics"
+- Check for hidden characters or extra spaces in headers
 
-##3. Interacting with the Patient
-Upload the .xlsx file using the sidebar uploader.
+### Performance issues
+- Try a smaller model: `ollama pull mistral:7b`
+- Close other applications to free up RAM
+- Reduce conversation length (use Reset button)
 
-Select a patient from the dropdown menu.
+## 🛠️ Technical Details
 
-Review the "Assessment Rubric" provided in the sidebar.
+**Stack:**
+- Frontend: Streamlit
+- LLM Backend: Ollama (local)
+- Data: Pandas + OpenPyXL
+- Language: Python 3.8+
 
-Type messages in the chat input field to begin the encounter.
+**Privacy:**
+- All data stays on your machine
+- No internet connection required after setup
+- No data sent to external servers
 
-To save the encounter, click Download Transcript in the sidebar to export a text log of the conversation.
+## 📚 Educational Use Cases
 
-##Configuration
-The application defaults to connecting to a local Ollama instance on port 11434 using the mistral model. These settings can be modified by setting environment variables before running the application.
+- **Medical Students:** Practice history-taking and communication skills
+- **Residents:** Rehearse difficult conversations (breaking bad news, end-of-life discussions)
+- **Faculty:** Create standardized scenarios for assessment
+- **Continuing Education:** Practice motivational interviewing, shared decision-making
 
-OLLAMA_URL: The full URL of the Ollama API (Default: http://localhost:11434)
+## 🤝 Tips for Effective Use
 
-OLLAMA_MODEL: The model tag to use for inference (Default: mistral)
+1. **Start broad:** Use open-ended questions
+2. **Build rapport:** Don't rush into medical questions
+3. **Listen actively:** The AI patient will respond to your approach
+4. **Review transcripts:** Identify areas for improvement
+5. **Compare approaches:** Try the same scenario with different communication styles
 
-##Technical Stack
-Frontend: Streamlit (Python)
+## 📝 License
 
-Data Processing: Pandas / OpenPyXL
+This project is provided as-is for educational purposes.
 
-Inference Engine: Ollama (Local LLM)
+## 🙏 Acknowledgments
 
-Communication: REST API (via Python Requests)
+- Built with [Streamlit](https://streamlit.io/)
+- Powered by [Ollama](https://ollama.ai)
+- Uses [Pandas](https://pandas.pydata.org/) for data handling
+
+---
+
+**Need help?** Check the troubleshooting section or review the sample `scenarios.xlsx` file for formatting examples.

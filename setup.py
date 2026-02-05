@@ -1,158 +1,94 @@
+#!/usr/bin/env python3
+"""
+Setup script for Simulated Standardized Patient (SP) Chatbot
+This script creates the virtual environment, installs dependencies, and generates sample data.
+"""
+
 import os
 import sys
 import subprocess
 import venv
 import platform
+from pathlib import Path
 
-# --- 1. Define File Contents ---
+def print_step(message):
+    """Print a formatted step message"""
+    print(f"\n{'='*60}")
+    print(f"  {message}")
+    print(f"{'='*60}")
 
-REQUIREMENTS_TXT = """streamlit
-pandas
-openpyxl
-requests
+def create_file(filename, content):
+    """Create a file with the given content"""
+    with open(filename, "w", encoding="utf-8") as f:
+        f.write(content)
+    print(f"✅ Created {filename}")
+
+def run_command(command, description):
+    """Run a command and handle errors"""
+    print(f"\n🔧 {description}...")
+    try:
+        subprocess.check_call(command)
+        print(f"✅ {description} completed successfully")
+        return True
+    except subprocess.CalledProcessError as e:
+        print(f"❌ Error during {description}: {e}")
+        return False
+
+def main():
+    print_step("🚀 Starting Setup for SP Chatbot")
+    
+    # Get the current directory
+    project_dir = Path.cwd()
+    
+    # 1. Create requirements.txt
+    print_step("📝 Creating configuration files")
+    
+    requirements_content = """streamlit>=1.28.0
+pandas>=2.0.0
+openpyxl>=3.1.0
+requests>=2.31.0
 """
-
-APP_PY_CONTENT = """import streamlit as st
-import pandas as pd
-import requests
-import json
-import os
-import time
-from datetime import datetime
-
-# --- Configuration ---
-OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")
-MODEL = os.getenv("OLLAMA_MODEL", "mistral") 
-
-# --- Helper Functions ---
-
-def load_scenarios_from_excel(uploaded_file):
-    try:
-        xls = pd.ExcelFile(uploaded_file)
-        
-        # Parse Sheet 1: Context/Rubric (First sheet)
-        df_context = pd.read_excel(xls, sheet_name=0)
-        # Handle case where header might be slightly different; allow flexible lookup if needed
-        # For now, we assume strict column names per instructions
-        scenario_title = df_context.get("Scenario", ["Unknown Scenario"])[0]
-        teaching_points = df_context.get("Teaching points", ["No rubric provided."])[0]
-        
-        # Parse Sheet 2: Patients (Second sheet)
-        df_patients = pd.read_excel(xls, sheet_name=1)
-        
-        if "Name" not in df_patients.columns or "Characteristics" not in df_patients.columns:
-            st.error("Sheet 2 must contain 'Name' and 'Characteristics' columns.")
-            return None
-
-        patients = {}
-        for _, row in df_patients.iterrows():
-            char_preview = (row['Characteristics'][:50] + '..') if len(str(row['Characteristics'])) > 50 else str(row['Characteristics'])
-            label = f"{row['Name']} - {char_preview}"
-            
-            patients[label] = {
-                "name": row['Name'],
-                "persona": row['Characteristics'],
-                "scenario_title": scenario_title,
-                "rubric": teaching_points
-            }
-            
-        return patients
-        
-    except Exception as e:
-        st.error(f"Error reading Excel file: {e}")
-        return None
-
-def query_ollama(messages):
-    payload = {
-        "model": MODEL,
-        "messages": messages,
-        "stream": False
-    }
-    try:
-        response = requests.post(f"{OLLAMA_URL}/api/chat", json=payload, timeout=30)
-        response.raise_for_status()
-        result = response.json()
-        return result.get("message", {}).get("content", "No response from model.")
-    except requests.exceptions.RequestException as e:
-        return f"Error contacting Ollama: {e}"
-
-# --- Main App ---
-
-st.set_page_config(page_title="Simulated Patient Chatbot", layout="wide")
-st.title("Simulated Standardized Patient (SP) Chatbot")
-
-with st.sidebar:
-    st.header("1. Scenario Setup")
-    uploaded_file = st.file_uploader("Upload Scenario Excel (.xlsx)", type=["xlsx"])
+    create_file("requirements.txt", requirements_content)
     
-    patients_data = {}
-    current_patient = None
+    # 2. Create virtual environment
+    print_step("🔧 Setting up virtual environment")
     
-    if uploaded_file:
-        patients_data = load_scenarios_from_excel(uploaded_file)
-        
-    if patients_data:
-        selected_label = st.selectbox("Choose Patient", options=list(patients_data.keys()))
-        current_patient = patients_data[selected_label]
-        
-        st.markdown("---")
-        st.subheader("Scenario: " + str(current_patient['scenario_title']))
-        st.subheader("Patient Persona")
-        st.info(current_patient['persona'])
-        st.subheader("Assessment Rubric")
-        st.success(current_patient['rubric'])
+    venv_dir = "venv"
+    if not os.path.exists(venv_dir):
+        print(f"Creating virtual environment in '{venv_dir}'...")
+        venv.create(venv_dir, with_pip=True)
+        print(f"✅ Virtual environment created")
     else:
-        st.warning("Please upload a scenario file to begin.")
-
-    st.markdown("---")
-    if st.button("Reset / Clear Conversation"):
-        st.session_state.messages = []
-
-    if st.session_state.get('messages'):
-        transcript = ""
-        for msg in st.session_state.messages:
-            role = "DOCTOR" if msg["role"] == "user" else "PATIENT"
-            transcript += f"{role}: {msg['content']}\\n\\n"
-        st.download_button("Download Transcript", transcript, f"transcript_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt")
-
-# --- Chat Interface ---
-
-if "messages" not in st.session_state:
-    st.session_state.messages = []
-
-for message in st.session_state.messages:
-    role_label = "Doctor (You)" if message["role"] == "user" else "Patient"
-    avatar = "👨‍⚕️" if message["role"] == "user" else "🤒"
-    with st.chat_message(message["role"], avatar=avatar):
-        st.write(f"**{role_label}:** {message['content']}")
-
-if current_patient:
-    if prompt := st.chat_input("Type your message to the patient..."):
-        st.session_state.messages.append({"role": "user", "content": prompt})
-        with st.chat_message("user", avatar="👨‍⚕️"):
-            st.write(f"**Doctor (You):** {prompt}")
-
-        system_prompt = (
-            f"You are roleplaying as {current_patient['name']}, a patient in a medical encounter. "
-            f"Persona details: {current_patient['persona']}\\n\\n"
-            "IMPORTANT: You are the PATIENT, not the doctor. Respond AS the patient. "
-            "Keep responses natural, concise (2-4 sentences), and consistent with your history."
-        )
-
-        api_messages = [{"role": "system", "content": system_prompt}] + st.session_state.messages
-        
-        with st.chat_message("assistant", avatar="🤒"):
-            with st.spinner("Patient is thinking..."):
-                response_text = query_ollama(api_messages)
-                st.write(f"**Patient:** {response_text}")
-        
-        st.session_state.messages.append({"role": "assistant", "content": response_text})
-else:
-    st.info("👈 Upload a scenario Excel file in the sidebar to start.")
-"""
-
-# Script to generate Excel (requires pandas, so we run this AFTER venv install)
-EXCEL_GENERATOR_SCRIPT = """
+        print(f"⚠️  '{venv_dir}' already exists, using existing environment")
+    
+    # 3. Determine paths based on OS
+    is_windows = platform.system() == "Windows"
+    if is_windows:
+        python_executable = os.path.join(venv_dir, "Scripts", "python.exe")
+        pip_executable = os.path.join(venv_dir, "Scripts", "pip.exe")
+        streamlit_executable = os.path.join(venv_dir, "Scripts", "streamlit.exe")
+        activate_cmd = f"{venv_dir}\\Scripts\\activate"
+    else:
+        python_executable = os.path.join(venv_dir, "bin", "python")
+        pip_executable = os.path.join(venv_dir, "bin", "pip")
+        streamlit_executable = os.path.join(venv_dir, "bin", "streamlit")
+        activate_cmd = f"source {venv_dir}/bin/activate"
+    
+    # 4. Install dependencies
+    print_step("📦 Installing dependencies")
+    
+    if not run_command([python_executable, "-m", "pip", "install", "--upgrade", "pip"], 
+                       "Upgrading pip"):
+        sys.exit(1)
+    
+    if not run_command([pip_executable, "install", "-r", "requirements.txt"], 
+                       "Installing required packages"):
+        sys.exit(1)
+    
+    # 5. Generate sample Excel file
+    print_step("📊 Generating sample scenario file")
+    
+    excel_script = """
 import pandas as pd
 
 # Data for Sheet 1: Scenario Info
@@ -173,79 +109,117 @@ data_patients = {
 df_scenario = pd.DataFrame(data_scenario)
 df_patients = pd.DataFrame(data_patients)
 
-with pd.ExcelWriter("scenarios.xlsx") as writer:
+with pd.ExcelWriter("scenarios.xlsx", engine='openpyxl') as writer:
     df_scenario.to_excel(writer, sheet_name="Scenario Info", index=False)
     df_patients.to_excel(writer, sheet_name="Patients", index=False)
 
-print("✅ 'scenarios.xlsx' created successfully.")
+print("✅ 'scenarios.xlsx' created successfully")
 """
-
-# --- 2. Setup Logic ---
-
-def create_file(filename, content):
-    with open(filename, "w", encoding="utf-8") as f:
-        f.write(content)
-    print(f"📄 Created {filename}")
-
-def main():
-    print("🚀 Starting Setup for SP Chatbot...")
-
-    # 1. Create source files
-    create_file("requirements.txt", REQUIREMENTS_TXT)
-    create_file("app.py", APP_PY_CONTENT)
-    create_file("_make_excel.py", EXCEL_GENERATOR_SCRIPT)
-
-    # 2. Create Virtual Environment
-    venv_dir = "venv"
-    if not os.path.exists(venv_dir):
-        print(f"📦 Creating virtual environment in '{venv_dir}'...")
-        venv.create(venv_dir, with_pip=True)
-    else:
-        print(f"📦 '{venv_dir}' already exists.")
-
-    # 3. Determine paths based on OS
-    is_windows = platform.system() == "Windows"
+    
+    create_file("_make_excel.py", excel_script)
+    
+    if run_command([python_executable, "_make_excel.py"], "Generating sample Excel file"):
+        # Clean up temporary script
+        os.remove("_make_excel.py")
+    
+    # 6. Create launch scripts
+    print_step("🚀 Creating launch scripts")
+    
     if is_windows:
-        python_executable = os.path.join(venv_dir, "Scripts", "python.exe")
-        pip_executable = os.path.join(venv_dir, "Scripts", "pip.exe")
-        streamlit_executable = os.path.join(venv_dir, "Scripts", "streamlit.exe")
-        activate_cmd = f"{venv_dir}\\Scripts\\activate"
+        batch_content = f"""@echo off
+echo Starting Simulated Patient Chatbot...
+call {activate_cmd}
+"{streamlit_executable}" run app.py
+pause
+"""
+        create_file("run.bat", batch_content)
+        print("✅ Created 'run.bat' for easy launching")
+        launch_command = "run.bat"
     else:
-        python_executable = os.path.join(venv_dir, "bin", "python")
-        pip_executable = os.path.join(venv_dir, "bin", "pip")
-        streamlit_executable = os.path.join(venv_dir, "bin", "streamlit")
-        activate_cmd = f"source {venv_dir}/bin/activate"
-
-    # 4. Install Dependencies
-    print("⬇️  Installing dependencies...")
-    try:
-        subprocess.check_call([python_executable, "-m", "pip", "install", "--upgrade", "pip"])
-        subprocess.check_call([pip_executable, "install", "-r", "requirements.txt"])
-    except subprocess.CalledProcessError as e:
-        print(f"❌ Error installing dependencies: {e}")
-        sys.exit(1)
-
-    # 5. Generate Excel File (using the environment we just built)
-    print("📊 Generating sample Excel file...")
-    try:
-        subprocess.check_call([python_executable, "_make_excel.py"])
-        os.remove("_make_excel.py") # Clean up
-    except subprocess.CalledProcessError as e:
-        print(f"❌ Error generating Excel file: {e}")
-
-    # 6. Create Launch Scripts
-    if is_windows:
-        with open("run.bat", "w") as f:
-            f.write(f'@echo off\ncall "{activate_cmd}"\n"{streamlit_executable}" run app.py\npause')
-        print("✅ Created 'run.bat' for easy launching.")
-    else:
-        with open("run.sh", "w") as f:
-            f.write(f'#!/bin/bash\n"{streamlit_executable}" run app.py')
+        shell_content = f"""#!/bin/bash
+echo "Starting Simulated Patient Chatbot..."
+"{streamlit_executable}" run app.py
+"""
+        create_file("run.sh", shell_content)
         os.chmod("run.sh", 0o755)
-        print("✅ Created 'run.sh' for easy launching.")
+        print("✅ Created 'run.sh' for easy launching")
+        launch_command = "./run.sh"
+    
+    # 7. Create README
+    readme_content = """# Simulated Standardized Patient (SP) Chatbot
 
-    print("\n✨ Setup Complete! ✨")
-    print(f"To start the app, run: {'run.bat' if is_windows else './run.sh'}")
+## Quick Start
+
+1. Make sure Ollama is installed and running:
+   ```bash
+   ollama serve
+   ```
+
+2. Pull the Mistral model (if you haven't already):
+   ```bash
+   ollama pull mistral
+   ```
+
+3. Run the application:
+   - **Windows**: Double-click `run.bat` or run from command prompt
+   - **macOS/Linux**: Run `./run.sh` from terminal
+
+4. Open your browser to `http://localhost:8501`
+
+## Usage
+
+1. Upload the `scenarios.xlsx` file (or your own scenario file)
+2. Select a patient from the dropdown
+3. Start the conversation!
+
+## Creating Custom Scenarios
+
+Create an Excel file with two sheets:
+
+**Sheet 1 (Scenario Info):**
+- Column A: "Scenario" - The scenario title
+- Column B: "Teaching points" - Assessment rubric/goals
+
+**Sheet 2 (Patients):**
+- Column A: "Name" - Patient name
+- Column B: "Characteristics" - Detailed persona and medical history
+
+## Configuration
+
+Set environment variables to customize:
+- `OLLAMA_URL`: Ollama API URL (default: http://localhost:11434)
+- `OLLAMA_MODEL`: Model to use (default: mistral)
+
+## Troubleshooting
+
+**Can't connect to Ollama:**
+- Make sure Ollama is running: `ollama serve`
+- Check the URL in the error message
+
+**Model not found:**
+- Pull the model: `ollama pull mistral`
+- Or set a different model: `export OLLAMA_MODEL=llama2`
+"""
+    create_file("README.txt", readme_content)
+    
+    # Final message
+    print_step("✨ Setup Complete! ✨")
+    print(f"""
+Next steps:
+
+1. Make sure Ollama is installed and running:
+   $ ollama serve
+
+2. Pull the Mistral model (if not already installed):
+   $ ollama pull mistral
+
+3. Start the application:
+   $ {launch_command}
+
+4. Open your browser to http://localhost:8501
+
+Happy simulating! 🏥
+""")
 
 if __name__ == "__main__":
     main()
